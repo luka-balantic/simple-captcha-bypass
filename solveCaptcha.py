@@ -7,6 +7,7 @@ img = Image.open('captcha.png')
 captchaLenght = 5;
 img = ImageEnhance.Contrast(img).enhance(2)
 img = img.convert('L')
+# img.show()
 
 R, G, B = img.convert('RGB').split()
 fullimage = img.load()
@@ -14,13 +15,15 @@ r = R.load()
 g = G.load()
 b = B.load()
 w, h = img.size
-colorBlur = 55
+colorBlur = 60
 # Convert non-black pixels to white
 for i in range(w):
     for j in range(h):
         if(r[i, j] > colorBlur or g[i, j] > colorBlur or b[i, j] > colorBlur):
             r[i, j] = 255
 img = Image.merge('RGB', (R, R, R))
+
+# img.show()
 
 img = ImageOps.invert(img)
 
@@ -53,6 +56,7 @@ for i in range(1, w): # 91 x
         if alreadySavedFirstBlackColumn == True:
             staringPointsOfColorness.append(i)
             alreadySavedFirstBlackColumn = False
+# img = Image.merge('RGB', (R, G, B))
 
 print startingPointsOfBlackness
 print staringPointsOfColorness
@@ -62,7 +66,7 @@ print startingPointsOfBlackness[0]
 print staringPointsOfColorness[0]
 
 cuttingPoints = []
-for index in range(len(startingPointsOfBlackness) - 1):
+for index in range(len(startingPointsOfBlackness) -1 ):
     if index != len(startingPointsOfBlackness): # If not last in array
         cuttingPoint = startingPointsOfBlackness[index] + ( (staringPointsOfColorness[index] - startingPointsOfBlackness[index] ) / 2 )
     else:
@@ -70,6 +74,7 @@ for index in range(len(startingPointsOfBlackness) - 1):
 
     cuttingPoints.append(cuttingPoint)
 
+cuttingPoints.append(w)
 print cuttingPoints
 
 cuttingSections = []
@@ -84,14 +89,19 @@ for index in range(len(cuttingPoints) - 1):
 
 print cuttingSections
 
+letters = []
+for index in range(len(cuttingSections)):
+    letter = img.crop((cuttingSections[index][0], 0, cuttingSections[index][1], h))
+    factor = 6
+    letter = letter.resize((letter.width * factor, letter.height * factor))
 
-img = Image.merge('RGB', (R, G, B))
-img = img.crop((cuttingSections[1][0], 0, cuttingSections[1][1], h))
+    letters.append(letter)
 
-factor = 3
-img = img.resize((img.width * factor, img.height * factor))
-img = ImageEnhance.Sharpness(img).enhance(1.5)
+for letterImage in letters:
+    letterImage.show()
+    print tes.image_to_string(letterImage, config='-psm 10')
 
-img.show()
 
-print tes.image_to_string(img)
+# img = ImageEnhance.Sharpness(img).enhance(1.5)
+
+
