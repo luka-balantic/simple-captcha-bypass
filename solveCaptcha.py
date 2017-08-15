@@ -3,10 +3,12 @@ from PIL import ImageEnhance
 from PIL import Image
 from PIL import ImageOps
 
-def solveCaptcha(imagePath):
+def solveCaptcha(imagePath, confurationName, blurAroungLettersRatio, contrastLevel, doInvert, zoomFactor):
+
+
     img = Image.open(imagePath)
     captchaLenght = 5;
-    img = ImageEnhance.Contrast(img).enhance(1) # add contrast to image
+    img = ImageEnhance.Contrast(img).enhance(contrastLevel) # add contrast to image
     img = img.convert('L')  # convert to black and white
     # img.show()
 
@@ -16,7 +18,7 @@ def solveCaptcha(imagePath):
     g = G.load()
     b = B.load()
     w, h = img.size
-    colorBlur = 100 #change to set hardness of color selection
+    colorBlur = blurAroungLettersRatio #change to set hardness of color selection
     # Convert non-black pixels to white
     for i in range(w):
         for j in range(h):
@@ -25,8 +27,8 @@ def solveCaptcha(imagePath):
     img = Image.merge('RGB', (R, R, R)) # merge layers
 
     # img.show()
-
-    img = ImageOps.invert(img) # invert image
+    if doInvert == True:
+        img = ImageOps.invert(img) # invert image
 
     R, G, B = img.convert('RGB').split() # split RGB layers
     r = R.load()
@@ -96,7 +98,7 @@ def solveCaptcha(imagePath):
     letters = []
     for index in range(len(cuttingSections)):
         letter = img.crop((cuttingSections[index][0], 0, cuttingSections[index][1], h)) # Crop image according to cuttingSections (cut letter out)
-        factor = 6
+        factor = zoomFactor
         letter = letter.resize((letter.width * factor, letter.height * factor)) # zoom image
 
         letters.append(letter)
