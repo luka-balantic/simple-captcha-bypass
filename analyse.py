@@ -1,47 +1,62 @@
 from solveCaptcha import solveCaptcha
-from results import results
 from time import *
 from random import *
+from pymongo import MongoClient
+import subprocess
+import sys
 
-# configuration = {
-#    'name': 'configuration-' + time.strftime("%Y-%m-%d-%H:%M")
-#    'options': {
-#        'blurAroungLettersRatio':  randint(1, 100)
-#        'contrastLevel':  randint(1, 2)
-#        'doInvert':  randint(1, 2)
-#        'zoomFactor':  randint(1, 4)
-#    }
-# }
-for index in range(50):
+client = MongoClient('mongodb://localhost:27018')
+db = client.local
+results = list(db.results.find({}))
+
+def saveInResultInDb(blurAroundLettersRatio, contrastLevel, doInvert, zoomFactor, isSuccessful, successfullReadings):
+    db.captchas.insert_one(
+        {
+            "blurAroundLettersRatio": blurAroundLettersRatio,
+            "contrastLevel": contrastLevel,
+            "doInvert": doInvert,
+            "zoomFactor": zoomFactor,
+            "isSuccessful": isSuccessful,
+            "successfullReadings": successfullReadings
+        }
+    )
+
+def writeInTerminal(configurations, files):
+    sys.stdout.flush()
+    printText = "\r\r Configuration tries: {0} / files scanned: {1}".format(configurations, files)
+    sys.stdout.write(printText)
+
+
+configurations = 0
+files = 0
+for index in range(1000):
+    configurations = configurations + 1
+    writeInTerminal(configurations, files)
     configurationName = 'configuration-'
-    blurAroungLettersRatio = randint(1, 100)
+    blurAroundLettersRatio = randint(1, 100)
     contrastLevel = randint(1, 2)
-    doInvert = randint(1, 2)
-    zoomFactor = randint(1, 4)
+    doInvert = randint(0, 1)
+    zoomFactor = randint(2, 4)
     success = []
 
     for file in results:
-        botResult = solveCaptcha(file['file'], configurationName, blurAroungLettersRatio, contrastLevel, doInvert, zoomFactor)
+        files = files + 1
+        writeInTerminal(configurations, files)
+        botResult = solveCaptcha('/captcha-breaker/prepare/captcha-samples/' + file['name'], configurationName, blurAroundLettersRatio, contrastLevel, doInvert, zoomFactor)
+        isSuccessful = ''
 
         if botResult == file['result']:
+            isSuccesful = True
             success.append(True)
-            print file['file']
-            print configurationName
-            print blurAroungLettersRatio
-            print contrastLevel
-            print doInvert
-            print zoomFactor
-            print botResult
         else:
+            isSuccessful = False
             success.append(False)
+
 
     successfullReadings = success.count(True)
     unSuccessfullReadings = success.count(False)
 
-#     print successfullReadings
-#     print unSuccessfullReadings
-#     print len(success)
-    successRatio = 100 / 15 * successfullReadings
+    successRatio = 100 / len(results) * successfullReadings
+    saveInResultInDb(blurAroundLettersRatio, contrastLevel, doInvert, zoomFactor, successRatio, successfullReadings)
 
     print "This configuration has {0}% success rate! :) ({1} out of {2} solved)".format(successRatio, successfullReadings, len(success))
-
