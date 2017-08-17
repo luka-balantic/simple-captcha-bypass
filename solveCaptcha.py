@@ -1,34 +1,114 @@
 import pytesseract as tes
+import random
 from PIL import ImageEnhance
 from PIL import Image
 from PIL import ImageOps
 
-def solveCaptcha(imagePath, confurationName, blurAroungLettersRatio, contrastLevel, doInvert, zoomFactor):
+def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, shrapnessLevel, doInvert, zoomFactor, shouldConvertLuminance):
+    def generateRandomOptionsCallingOrder(arrayOfOptions):
+        functionsSet = range(0, len(arrayOfOptions))
+        random.shuffle(functionsSet)
 
+        return functionsSet
+
+    def setContrast(img, options):
+        return ImageEnhance.Contrast(img).enhance(options['contrastLevel']) # add contrast to image
+
+    def setSharpness(img, options):
+        return ImageEnhance.Sharpness(img).enhance(options['shrapnessLevel']) # add contrast to image
+
+    def mixOptions(img):
+        arrayOfOptions = [
+            {
+                "name": 'setContrast',
+                "function": setContrast,
+                "args": {
+                    "contrastLevel": contrastLevel
+                }
+            },
+            {
+                 "name": 'setSharpness',
+                 "function": setSharpness,
+                 "args": {
+                    "shrapnessLevel": shrapnessLevel
+                 }
+            },
+#             {
+#                  "function": removeAllButOneColors,
+#                  "name": "removeAllButOneColors",
+#                  "args": {
+#                     "colorToKeep": colorToKeep,
+#                      "blurAroungLettersRatio": blurAroungLettersRatio
+#                  }
+#             },
+#             {
+#                  "function": invert,
+#                  "name": "invert",
+#                  "args": {
+#                     "doInvert": doInvert
+#                  }
+#             }
+        ]
+
+        functionsSet = generateRandomOptionsCallingOrder(arrayOfOptions)
+        functionsOrderInfo = []
+        for index, function in enumerate(functionsSet):
+            functionObject = arrayOfOptions[function]
+            functionDef = functionObject['function']
+            functionName = functionObject['name']
+            functionArgs = functionObject['args']
+            functionInfo = {
+                "order": index,
+                "functionName": functionName,
+            }
+
+            functionsOrderInfo.append(functionInfo)
+
+            img = functionDef(img, functionArgs)
+
+        return {
+            "img": img,
+            "functionsOrderInfo": functionsOrderInfo
+        }
+
+    def convertToLuminance(img, options):
+#         if options['shouldConvertLuminance']:
+#             return img.convert('L')  # convert to black and white
+
+        return img
+
+
+    # img.show()
+    def removeAllButOneColors(img, options):
+        R, G, B = img.convert('RGB').split() # split RGB layers
+        red = R.load()
+        green = G.load()
+        blue = B.load()
+        width, height = img.size
+        for x in range(width):
+            for y in range(height):
+                if(red[x, y] > options['blurAroungLettersRatio'] or green[x, y] > options['blurAroungLettersRatio'] or blue[x, y] > options['blurAroungLettersRatio']):
+                    red[x, y] = 255
+        return Image.merge('RGB', (R, R, R))
+
+    # img.show()
+
+    def invert(img, options):
+        if options['doInvert'] == True:
+            return ImageOps.invert(img)
 
     img = Image.open(imagePath)
-    captchaLenght = 5;
-    img = ImageEnhance.Contrast(img).enhance(contrastLevel) # add contrast to image
-    img = img.convert('L')  # convert to black and white
-    # img.show()
 
-    R, G, B = img.convert('RGB').split() # split RGB layers
-    fullimage = img.load()
-    r = R.load()
-    g = G.load()
-    b = B.load()
-    w, h = img.size
-    colorBlur = blurAroungLettersRatio #change to set hardness of color selection
-    # Convert non-black pixels to white
-    for i in range(w):
-        for j in range(h):
-            if(r[i, j] > colorBlur or g[i, j] > colorBlur or b[i, j] > colorBlur):
-                r[i, j] = 255
-    img = Image.merge('RGB', (R, R, R)) # merge layers
+    mixedOptions = mixOptions(img)
+    functionsOrderInfo = mixedOptions['functionsOrderInfo']
+    img = mixedOptions['img']
+    img = convertToLuminance(img, {"shouldConvertLuminance": shouldConvertLuminance })
+    img = removeAllButOneColors(img, {
+        "colorToKeep": colorToKeep,
+        "blurAroungLettersRatio": blurAroungLettersRatio
+    })
 
-    # img.show()
-    if doInvert == True:
-        img = ImageOps.invert(img) # invert image
+    img = invert(img, {"doInvert": True})
 
     R, G, B = img.convert('RGB').split() # split RGB layers
     r = R.load()
@@ -43,8 +123,9 @@ def solveCaptcha(imagePath, confurationName, blurAroungLettersRatio, contrastLev
     for i in range(1, w): # 91 x
         column = []
         for j in range(h): #24 x
+
             if r[i, j] == 0 and g[i, j] == 0 and b [i, j] == 0:
-                column.append(True) # If pixel is black, add True to column
+               column.append(True) # If pixel is black, add True to column
             else:
                 column.append(False)
 
@@ -59,11 +140,13 @@ def solveCaptcha(imagePath, confurationName, blurAroungLettersRatio, contrastLev
                 staringPointsOfColorness.append(i)
                 alreadySavedFirstBlackColumn = False
     # img = Image.merge('RGB', (R, G, B))
-
-    # print startingPointsOfBlackness
-    # print staringPointsOfColorness
-    # print blackColumns
-    # print coloredColumns
+#     img.show()
+#     print startingPointsOfBlackness
+#     print staringPointsOfColorness
+#     print "black"
+#     print blackColumns
+#     print 'color'
+#     print coloredColumns
     # print startingPointsOfBlackness[0]
     # print staringPointsOfColorness[0]
 
@@ -105,11 +188,13 @@ def solveCaptcha(imagePath, confurationName, blurAroungLettersRatio, contrastLev
 
     captchaFinal = ""
     for letterImage in letters:
-#         letterImage.show()
         captchaFinal = captchaFinal + tes.image_to_string(letterImage, config='-psm 10')  # read each letter
 
-    return captchaFinal
-#     img = ImageEnhance.Sharpness(img).enhance(1.5)
+#     print captchaFinal
+    return {
+        "captchaResult": captchaFinal,
+        "functionsOrderInfo": functionsOrderInfo
+    }
 
 # # print solveCaptcha('captcha.png')
 
