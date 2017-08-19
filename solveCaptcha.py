@@ -4,7 +4,7 @@ from PIL import ImageEnhance
 from PIL import Image
 from PIL import ImageOps
 
-def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, shrapnessLevel, doInvert, zoomFactor, shouldConvertLuminance):
+def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, shrapnessLevel, brightnessLevel, colorBalanceLevel, doInvert, zoomFactor, shouldConvertLuminance, readLetter):
     def generateRandomOptionsCallingOrder(arrayOfOptions):
         functionsSet = range(0, len(arrayOfOptions))
         random.shuffle(functionsSet)
@@ -16,6 +16,12 @@ def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, 
 
     def setSharpness(img, options):
         return ImageEnhance.Sharpness(img).enhance(options['shrapnessLevel']) # add contrast to image
+
+    def setBrightness(img, options):
+        return ImageEnhance.Brightness(img).enhance(options['brightnessLevel']) # add contrast to image
+
+    def setColorBalance(img, options):
+        return ImageEnhance.Color(img).enhance(options['colorBalanceLevel']) # add contrast to image
 
     def mixOptions(img):
         arrayOfOptions = [
@@ -33,21 +39,20 @@ def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, 
                     "shrapnessLevel": shrapnessLevel
                  }
             },
-#             {
-#                  "function": removeAllButOneColors,
-#                  "name": "removeAllButOneColors",
-#                  "args": {
-#                     "colorToKeep": colorToKeep,
-#                      "blurAroungLettersRatio": blurAroungLettersRatio
-#                  }
-#             },
-#             {
-#                  "function": invert,
-#                  "name": "invert",
-#                  "args": {
-#                     "doInvert": doInvert
-#                  }
-#             }
+            {
+                 "name": 'setBrightness',
+                 "function": setBrightness,
+                 "args": {
+                    "brightnessLevel": brightnessLevel
+                 }
+            },
+            {
+                 "name": 'setColorBalance',
+                 "function": setColorBalance,
+                 "args": {
+                    "colorBalanceLevel": colorBalanceLevel
+                 }
+            }
         ]
 
         functionsSet = generateRandomOptionsCallingOrder(arrayOfOptions)
@@ -70,6 +75,70 @@ def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, 
             "img": img,
             "functionsOrderInfo": functionsOrderInfo
         }
+
+    def cutImageToLetters(img):
+        R, G, B = img.convert('RGB').split() # split RGB layers
+        r = R.load()
+        g = G.load()
+        b = B.load()
+        width, height = img.size
+        blackColumns = []
+        coloredColumns = []
+        startingPointsOfBlackness = []
+        staringPointsOfColorness = []
+        alreadySavedFirstBlackColumn = False
+        for x in range(1, width):
+            column = []
+            for y in range(height):
+
+                if r[x, y] == 0 and g[x, y] == 0 and b [x, y] == 0:
+                   column.append(True) # If pixel is black, add True to column
+                else:
+                   column.append(False)
+
+            if all(item for item in column): # If all in column are black
+                blackColumns.append(x) # Add column to list of black columns
+                if alreadySavedFirstBlackColumn == False:
+                    startingPointsOfBlackness.append(x)
+                    alreadySavedFirstBlackColumn = True
+            else:
+                coloredColumns.append(x) # Add column to list of colored columns
+                if alreadySavedFirstBlackColumn == True:
+                    staringPointsOfColorness.append(x)
+                    alreadySavedFirstBlackColumn = False
+
+        cuttingPoints = []
+        for index in range(len(startingPointsOfBlackness) -1 ):
+            if index != len(startingPointsOfBlackness): # If not last in array
+                cuttingPoint = startingPointsOfBlackness[index] + ( (staringPointsOfColorness[index] - startingPointsOfBlackness[index] ) / 2 ) # center of blackness section
+            else:
+                cuttingPoint = startingPointsOfBlackness[index] + ( ( w - startingPointsOfBlackness[index] ) / 2 ) # center of blackness section (last blackness)
+
+            cuttingPoints.append(cuttingPoint)
+
+        cuttingPoints.append(width) # add last cutting point which is last pixel of image width
+
+        #Create cutting section groups out of cutting points
+        #Image will be cutted between each two points generate
+        cuttingSections = []
+        for index in range(len(cuttingPoints) - 1):
+            if index != len(startingPointsOfBlackness): # If not last in array
+                cuttingSection = [ cuttingPoints[index], cuttingPoints[index + 1] ]
+            else:
+                cuttingSection = [ cuttingPoints[index], width ]
+
+            cuttingSections.append(cuttingSection)
+
+        # print cuttingSections
+        letters = []
+        for index in range(len(cuttingSections)):
+            letter = img.crop((cuttingSections[index][0], 0, cuttingSections[index][1], height)) # Crop image according to cuttingSections (cut letter out)
+            factor = zoomFactor
+            letter = letter.resize((letter.width * factor, letter.height * factor)) # zoom image
+
+            letters.append(letter)
+
+        return letters
 
     def convertToLuminance(img, options):
 #         if options['shouldConvertLuminance']:
@@ -97,6 +166,18 @@ def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, 
         if options['doInvert'] == True:
             return ImageOps.invert(img)
 
+    def readCaptcha(objectToRead, readLetter=False):
+        if readLetter:
+            captchaFinal = ""
+            for letterImage in objectToRead:
+                captchaFinal = captchaFinal + tes.image_to_string(letterImage, config='-psm 10')  # read each letter
+
+        if not readLetter:
+            captchaFinal = tes.image_to_string(objectToRead)  # read each letter
+
+        return captchaFinal
+
+    # Start
     img = Image.open(imagePath)
 
     mixedOptions = mixOptions(img)
@@ -110,89 +191,15 @@ def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, 
 
     img = invert(img, {"doInvert": True})
 
-    R, G, B = img.convert('RGB').split() # split RGB layers
-    r = R.load()
-    g = G.load()
-    b = B.load()
-    w, h = img.size
-    blackColumns = []
-    coloredColumns = []
-    startingPointsOfBlackness = []
-    staringPointsOfColorness = []
-    alreadySavedFirstBlackColumn = False
-    for i in range(1, w): # 91 x
-        column = []
-        for j in range(h): #24 x
-
-            if r[i, j] == 0 and g[i, j] == 0 and b [i, j] == 0:
-               column.append(True) # If pixel is black, add True to column
-            else:
-                column.append(False)
-
-        if all(item for item in column): # If all in column are black
-            blackColumns.append(i) # Add column to list of black columns
-            if alreadySavedFirstBlackColumn == False:
-                startingPointsOfBlackness.append(i)
-                alreadySavedFirstBlackColumn = True
-        else:
-            coloredColumns.append(i) # Add column to list of colored columns
-            if alreadySavedFirstBlackColumn == True:
-                staringPointsOfColorness.append(i)
-                alreadySavedFirstBlackColumn = False
-    # img = Image.merge('RGB', (R, G, B))
-#     img.show()
-#     print startingPointsOfBlackness
-#     print staringPointsOfColorness
-#     print "black"
-#     print blackColumns
-#     print 'color'
-#     print coloredColumns
-    # print startingPointsOfBlackness[0]
-    # print staringPointsOfColorness[0]
-
-    # Calculate middle of cutting points (hit inbetween letters - as centered as possible)
-    #
-    cuttingPoints = []
-    for index in range(len(startingPointsOfBlackness) -1 ):
-        if index != len(startingPointsOfBlackness): # If not last in array
-            cuttingPoint = startingPointsOfBlackness[index] + ( (staringPointsOfColorness[index] - startingPointsOfBlackness[index] ) / 2 ) # center of blackness section
-        else:
-            cuttingPoint = startingPointsOfBlackness[index] + ( ( w - startingPointsOfBlackness[index] ) / 2 ) # center of blackness section (last blackness)
-
-        cuttingPoints.append(cuttingPoint)
-
-    cuttingPoints.append(w) # add last cutting point which is last pixel of image width
-    # print cuttingPoints
-
-    cuttingSections = []
-
-    #Create cutting section groups out of cutting points
-    #Image will be cutted between each two points generated
-    for index in range(len(cuttingPoints) - 1):
-        if index != len(startingPointsOfBlackness): # If not last in array
-            cuttingSection = [ cuttingPoints[index], cuttingPoints[index + 1] ]
-        else:
-            cuttingSection = [ cuttingPoints[index], w ]
-
-        cuttingSections.append(cuttingSection)
-
-    # print cuttingSections
-
-    letters = []
-    for index in range(len(cuttingSections)):
-        letter = img.crop((cuttingSections[index][0], 0, cuttingSections[index][1], h)) # Crop image according to cuttingSections (cut letter out)
-        factor = zoomFactor
-        letter = letter.resize((letter.width * factor, letter.height * factor)) # zoom image
-
-        letters.append(letter)
-
-    captchaFinal = ""
-    for letterImage in letters:
-        captchaFinal = captchaFinal + tes.image_to_string(letterImage, config='-psm 10')  # read each letter
+    if (readLetter):
+        letters = cutImageToLetters(img)
+        captchaResult = readCaptcha(letters, True)
+    else:
+        captchaResult = readCaptcha(img)
 
 #     print captchaFinal
     return {
-        "captchaResult": captchaFinal,
+        "captchaResult": captchaResult,
         "functionsOrderInfo": functionsOrderInfo
     }
 
