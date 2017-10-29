@@ -4,7 +4,6 @@ from PIL import ImageEnhance
 from PIL import Image
 from PIL import ImageOps
 from PIL import ImageDraw
-from config import ROOT_DIR
 import numpy as np
 import math
 
