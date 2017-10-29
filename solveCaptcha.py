@@ -3,7 +3,7 @@ import random
 from PIL import ImageEnhance
 from PIL import Image
 from PIL import ImageOps
-from alignLetter import alignLetter
+from lib.alignLetter import alignLetter
 
 def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, shrapnessLevel, brightnessLevel, colorBalanceLevel, doInvert, zoomFactor, shouldConvertLuminance, readLetter, shouldAlignLetter, mixOptions=None, passedOption=None):
     def generateRandomOptionsCallingOrder(arrayOfOptions):
