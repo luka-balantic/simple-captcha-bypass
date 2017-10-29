@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  ### MONGO ###
+  mongo:
+    image: mongo
+    container_name: mongoCaptcha
+    entrypoint: [ "/usr/bin/mongod"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo:/data/db/captcha

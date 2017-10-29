@@ -4,7 +4,7 @@ from PIL import Image
 from configuration import CONFIG
 
 client = MongoClient()
-db = client.local
+db = client.main
 
 def askForCaptchaResult(image):
     img = Image.open(CONFIG['CAPTCHA_SAMPLES_DIR'] + image)

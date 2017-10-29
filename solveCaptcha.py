@@ -3,10 +3,11 @@ import random
 from PIL import ImageEnhance
 from PIL import Image
 from PIL import ImageOps
+from alignLetter import alignLetter
 
-def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, shrapnessLevel, brightnessLevel, colorBalanceLevel, doInvert, zoomFactor, shouldConvertLuminance, readLetter):
+def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, shrapnessLevel, brightnessLevel, colorBalanceLevel, doInvert, zoomFactor, shouldConvertLuminance, readLetter, shouldAlignLetter, mixOptions=None, passedOption=None):
     def generateRandomOptionsCallingOrder(arrayOfOptions):
-        functionsSet = range(0, len(arrayOfOptions))
+        functionsSet = list(range(0, len(arrayOfOptions)))
         random.shuffle(functionsSet)
 
         return functionsSet
@@ -23,7 +24,7 @@ def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, 
     def setColorBalance(img, options):
         return ImageEnhance.Color(img).enhance(options['colorBalanceLevel']) # add contrast to image
 
-    def mixOptions(img):
+    def mixOptions(img, shouldMix, passedFunctionSet=None):
         arrayOfOptions = [
             {
                 "name": 'setContrast',
@@ -146,8 +147,6 @@ def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, 
 
         return img
 
-
-    # img.show()
     def removeAllButOneColors(img, options):
         R, G, B = img.convert('RGB').split() # split RGB layers
         red = R.load()
@@ -160,8 +159,6 @@ def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, 
                     red[x, y] = 255
         return Image.merge('RGB', (R, R, R))
 
-    # img.show()
-
     def invert(img, options):
         if options['doInvert'] == True:
             return ImageOps.invert(img)
@@ -170,7 +167,10 @@ def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, 
         if readLetter:
             captchaFinal = ""
             for letterImage in objectToRead:
-                captchaFinal = captchaFinal + tes.image_to_string(letterImage, config='-psm 10')  # read each letter
+                if (shouldAlignLetter):
+                    letterImage = alignLetter(letterImage)
+                letterResult = tes.image_to_string(letterImage, config='-psm 10')
+                captchaFinal = captchaFinal + letterResult # read each letter
 
         if not readLetter:
             captchaFinal = tes.image_to_string(objectToRead)  # read each letter
@@ -180,9 +180,10 @@ def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, 
     # Start
     img = Image.open(imagePath)
 
-    mixedOptions = mixOptions(img)
+    mixedOptions = mixOptions(img, False, )
     functionsOrderInfo = mixedOptions['functionsOrderInfo']
     img = mixedOptions['img']
+
     img = convertToLuminance(img, {"shouldConvertLuminance": shouldConvertLuminance })
     img = removeAllButOneColors(img, {
         "colorToKeep": colorToKeep,
@@ -197,11 +198,7 @@ def solveCaptcha(imagePath, colorToKeep, blurAroungLettersRatio, contrastLevel, 
     else:
         captchaResult = readCaptcha(img)
 
-#     print captchaFinal
     return {
         "captchaResult": captchaResult,
         "functionsOrderInfo": functionsOrderInfo
     }
-
-# # print solveCaptcha('captcha.png')
-

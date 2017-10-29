@@ -1,4 +1,6 @@
+.gitignore
 *.pyc
 /config.py
 /prepare/captcha-samples/*
 /prepare/configuration.py
+/mongo
