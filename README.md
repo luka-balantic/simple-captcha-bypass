@@ -1,2 +1,2 @@
 # simple-captcha-bypass
-Doesnt work yet :)
+Kinda works :)
